@@ -93,7 +93,7 @@ function rowToRequest(row: Record<string, unknown>): BookRequest {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Turso (@libsql/client)                                                     */
+/* Turso (@libsql/client or @libsql/client/web on serverless)                 */
 /* -------------------------------------------------------------------------- */
 
 type LibsqlClient = {
@@ -110,11 +110,32 @@ type LibsqlClient = {
 let tursoClient: LibsqlClient | null = null;
 let tursoReady: Promise<void> | null = null;
 
+function isServerlessRuntime(): boolean {
+  return Boolean(
+    process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+  );
+}
+
+/** Web/HTTP client prefers https:// URLs over libsql:// WebSocket URLs. */
+function tursoUrlForClient(url: string, useWeb: boolean): string {
+  if (useWeb && url.startsWith("libsql://")) {
+    return "https://" + url.slice("libsql://".length);
+  }
+  return url;
+}
+
 async function getTurso(): Promise<LibsqlClient> {
   if (!tursoClient) {
-    const { createClient } = await import("@libsql/client");
+    const useWeb = isServerlessRuntime();
+    const { createClient } = useWeb
+      ? await import("@libsql/client/web")
+      : await import("@libsql/client");
+    const url = tursoUrlForClient(
+      process.env.TURSO_DATABASE_URL!,
+      useWeb
+    );
     tursoClient = createClient({
-      url: process.env.TURSO_DATABASE_URL!,
+      url,
       authToken: process.env.TURSO_AUTH_TOKEN!,
     }) as unknown as LibsqlClient;
   }

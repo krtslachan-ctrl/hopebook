@@ -6,14 +6,23 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  if (!isAdminAuthenticated()) {
-    return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+  try {
+    if (!isAdminAuthenticated()) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+    }
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status") || undefined;
+    const q = searchParams.get("q") || undefined;
+    const items = await listRequests({ status, q });
+    return NextResponse.json({ items });
+  } catch (e) {
+    console.error(e);
+    const message =
+      e instanceof Error && e.message
+        ? e.message
+        : "요청 목록 조회 중 오류가 발생했습니다.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-  const { searchParams } = new URL(req.url);
-  const status = searchParams.get("status") || undefined;
-  const q = searchParams.get("q") || undefined;
-  const items = await listRequests({ status, q });
-  return NextResponse.json({ items });
 }
 
 type BookPayload = {
