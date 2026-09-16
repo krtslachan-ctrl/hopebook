@@ -35,15 +35,20 @@ export interface BookRequest {
   updated_at: string;
 }
 
+/** Fields needed for a new book request. Legacy columns get defaults in createRequest. */
 export interface CreateRequestInput {
   applicant_name: string;
-  department: string;
-  email: string;
   title: string;
   author: string;
   publisher?: string;
+  /** Legacy — default "" */
+  department?: string;
+  /** Legacy — default "-" */
+  email?: string;
   isbn?: string;
   pub_year?: string;
-  reason: string;
-  priority: Priority;
+  /** Legacy — default "-" */
+  reason?: string;
+  /** Legacy — default "보통" */
+  priority?: Priority;
 }

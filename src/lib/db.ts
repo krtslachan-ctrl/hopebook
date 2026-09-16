@@ -1,4 +1,4 @@
-import type { BookRequest, CreateRequestInput, Status } from "./types";
+import type { BookRequest, CreateRequestInput, Priority, Status } from "./types";
 
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS requests (
@@ -185,7 +185,47 @@ async function tursoList(opts?: {
   return res.rows.map((r) => rowToRequest(r));
 }
 
+
+function normalizeCreateInput(input: CreateRequestInput): {
+  applicant_name: string;
+  department: string;
+  email: string;
+  title: string;
+  author: string;
+  publisher: string;
+  isbn?: string;
+  pub_year?: string;
+  reason: string;
+  priority: Priority;
+} {
+  const title = (input.title || "").trim();
+  const author = (input.author || "").trim();
+  const applicant_name = (input.applicant_name || "").trim();
+  if (!applicant_name) {
+    throw new Error("신청자 성명은 필수입니다.");
+  }
+  if (!title) {
+    throw new Error("도서명은 필수입니다.");
+  }
+  if (!author) {
+    throw new Error("저자는 필수입니다.");
+  }
+  return {
+    applicant_name,
+    title,
+    author,
+    publisher: (input.publisher || "").trim(),
+    department: (input.department ?? "").trim(),
+    email: (input.email ?? "-").trim() || "-",
+    isbn: (input.isbn || "").trim() || undefined,
+    pub_year: (input.pub_year || "").trim() || undefined,
+    reason: (input.reason ?? "-").trim() || "-",
+    priority: input.priority || "보통",
+  };
+}
+
 async function tursoCreate(input: CreateRequestInput): Promise<BookRequest> {
+  const data = normalizeCreateInput(input);
   const client = await getTurso();
   const now = new Date().toISOString();
   const result = await client.execute({
@@ -194,16 +234,16 @@ async function tursoCreate(input: CreateRequestInput): Promise<BookRequest> {
       isbn, pub_year, reason, priority, status, admin_memo, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '접수', NULL, ?, ?)`,
     args: [
-      input.applicant_name,
-      input.department,
-      input.email,
-      input.title,
-      input.author,
-      input.publisher || "",
-      input.isbn || null,
-      input.pub_year || null,
-      input.reason,
-      input.priority,
+      data.applicant_name,
+      data.department,
+      data.email,
+      data.title,
+      data.author,
+      data.publisher || "",
+      data.isbn || null,
+      data.pub_year || null,
+      data.reason,
+      data.priority,
       now,
       now,
     ],
@@ -388,6 +428,7 @@ async function sqlJsList(opts?: {
 }
 
 async function sqlJsCreate(input: CreateRequestInput): Promise<BookRequest> {
+  const data = normalizeCreateInput(input);
   const db = await getSqlJs();
   const now = new Date().toISOString();
   db.run(
@@ -396,16 +437,16 @@ async function sqlJsCreate(input: CreateRequestInput): Promise<BookRequest> {
       isbn, pub_year, reason, priority, status, admin_memo, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '접수', NULL, ?, ?)`,
     [
-      input.applicant_name,
-      input.department,
-      input.email,
-      input.title,
-      input.author,
-      input.publisher || "",
-      input.isbn || null,
-      input.pub_year || null,
-      input.reason,
-      input.priority,
+      data.applicant_name,
+      data.department,
+      data.email,
+      data.title,
+      data.author,
+      data.publisher || "",
+      data.isbn || null,
+      data.pub_year || null,
+      data.reason,
+      data.priority,
       now,
       now,
     ]

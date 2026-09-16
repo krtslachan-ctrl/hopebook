@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRequest, listRequests } from "@/lib/db";
 import { isAdminAuthenticated } from "@/lib/auth";
-import { PRIORITIES, type Priority } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,63 +16,86 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ items });
 }
 
+type BookPayload = {
+  title?: unknown;
+  author?: unknown;
+  publisher?: unknown;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const required = [
-      "applicant_name",
-      "department",
-      "email",
-      "title",
-      "author",
-      "reason",
-      "priority",
-    ] as const;
 
-    for (const key of required) {
-      if (!body[key] || String(body[key]).trim() === "") {
+    const applicant_name = String(body.applicant_name ?? "").trim();
+    if (!applicant_name) {
+      return NextResponse.json(
+        { error: "필수 항목이 누락되었습니다: applicant_name" },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(body.books)) {
+      return NextResponse.json(
+        { error: "books 배열이 필요합니다." },
+        { status: 400 }
+      );
+    }
+
+    const books = (body.books as BookPayload[])
+      .map((b) => ({
+        title: String(b?.title ?? "").trim(),
+        author: String(b?.author ?? "").trim(),
+        publisher: b?.publisher ? String(b.publisher).trim() : "",
+      }))
+      .filter((b) => b.title || b.author || b.publisher);
+
+    if (books.length === 0) {
+      return NextResponse.json(
+        { error: "최소 1권의 도서(도서명·저자)를 입력해 주세요." },
+        { status: 400 }
+      );
+    }
+    if (books.length > 10) {
+      return NextResponse.json(
+        { error: "한 번에 최대 10권까지 신청할 수 있습니다." },
+        { status: 400 }
+      );
+    }
+
+    for (const book of books) {
+      if (!book.title || !book.author) {
         return NextResponse.json(
-          { error: `필수 항목이 누락되었습니다: ${key}` },
+          { error: "사용된 행에는 도서명과 저자가 모두 필요합니다." },
           { status: 400 }
         );
       }
     }
 
-    const email = String(body.email).trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json(
-        { error: "올바른 이메일 주소를 입력해 주세요." },
-        { status: 400 }
-      );
+    const items = [];
+    for (const book of books) {
+      const item = await createRequest({
+        applicant_name,
+        title: book.title,
+        author: book.author,
+        publisher: book.publisher || "",
+        department: "",
+        email: "-",
+        reason: "-",
+        priority: "보통",
+      });
+      items.push(item);
     }
 
-    const priority = String(body.priority).trim() as Priority;
-    if (!PRIORITIES.includes(priority)) {
-      return NextResponse.json(
-        { error: "우선순위가 올바르지 않습니다." },
-        { status: 400 }
-      );
-    }
-
-    const item = await createRequest({
-      applicant_name: String(body.applicant_name).trim(),
-      department: String(body.department).trim(),
-      email,
-      title: String(body.title).trim(),
-      author: String(body.author).trim(),
-      publisher: body.publisher ? String(body.publisher).trim() : "",
-      isbn: body.isbn ? String(body.isbn).trim() : undefined,
-      pub_year: body.pub_year ? String(body.pub_year).trim() : undefined,
-      reason: String(body.reason).trim(),
-      priority,
-    });
-
-    return NextResponse.json({ ok: true, item }, { status: 201 });
+    return NextResponse.json(
+      { ok: true, count: items.length, items },
+      { status: 201 }
+    );
   } catch (e) {
     console.error(e);
-    return NextResponse.json(
-      { error: "신청 처리 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    const message =
+      e instanceof Error && e.message
+        ? e.message
+        : "신청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
