@@ -122,6 +122,25 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteItem(id: number) {
+    if (!window.confirm("이 신청을 삭제할까요?")) return;
+    try {
+      const res = await fetch(`/api/requests/${id}`, { method: "DELETE" });
+      if (res.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "삭제 실패");
+        return;
+      }
+      await load();
+    } catch {
+      alert("네트워크 오류");
+    }
+  }
+
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
     router.replace("/admin/login");
@@ -291,13 +310,22 @@ export default function AdminPage() {
                       {item.admin_memo || "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        className="btn-secondary !py-1.5 !px-3 text-xs"
-                        onClick={() => openEdit(item)}
-                      >
-                        상태/메모
-                      </button>
+                      <div className="flex flex-col gap-1.5">
+                        <button
+                          type="button"
+                          className="btn-secondary !py-1.5 !px-3 text-xs"
+                          onClick={() => openEdit(item)}
+                        >
+                          상태/메모
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm hover:bg-red-50"
+                          onClick={() => deleteItem(item.id)}
+                        >
+                          삭제
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

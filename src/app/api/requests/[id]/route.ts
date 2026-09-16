@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateRequest } from "@/lib/db";
+import { updateRequest, deleteRequest } from "@/lib/db";
 import { isAdminAuthenticated } from "@/lib/auth";
 import { STATUSES, type Status } from "@/lib/types";
 
@@ -48,6 +48,37 @@ export async function PATCH(
     console.error(e);
     return NextResponse.json(
       { error: "업데이트 중 오류가 발생했습니다." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  if (!isAdminAuthenticated()) {
+    return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+  }
+
+  const id = Number(params.id);
+  if (!Number.isFinite(id)) {
+    return NextResponse.json({ error: "잘못된 ID입니다." }, { status: 400 });
+  }
+
+  try {
+    const deleted = await deleteRequest(id);
+    if (!deleted) {
+      return NextResponse.json(
+        { error: "신청을 찾을 수 없습니다." },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json(
+      { error: "삭제 중 오류가 발생했습니다." },
       { status: 500 }
     );
   }

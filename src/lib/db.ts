@@ -317,6 +317,21 @@ async function tursoGet(id: number): Promise<BookRequest | null> {
   return rows.rows[0] ? rowToRequest(rows.rows[0]) : null;
 }
 
+
+async function tursoDelete(id: number): Promise<boolean> {
+  const client = await getTurso();
+  const existing = await client.execute({
+    sql: "SELECT id FROM requests WHERE id = ?",
+    args: [id],
+  });
+  if (!existing.rows[0]) return false;
+  await client.execute({
+    sql: "DELETE FROM requests WHERE id = ?",
+    args: [id],
+  });
+  return true;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Local sql.js fallback                                                      */
 /* -------------------------------------------------------------------------- */
@@ -511,6 +526,18 @@ async function sqlJsGet(id: number): Promise<BookRequest | null> {
   return rows[0] || null;
 }
 
+
+async function sqlJsDelete(id: number): Promise<boolean> {
+  const db = await getSqlJs();
+  const existing = sqlJsQueryAll(db, "SELECT * FROM requests WHERE id = ?", [
+    id,
+  ]);
+  if (!existing.length) return false;
+  db.run("DELETE FROM requests WHERE id = ?", [id]);
+  sqlJsPersist(db);
+  return true;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Public API                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -537,6 +564,11 @@ export async function updateRequest(
 
 export async function getRequest(id: number): Promise<BookRequest | null> {
   return isTursoEnabled() ? tursoGet(id) : sqlJsGet(id);
+}
+
+
+export async function deleteRequest(id: number): Promise<boolean> {
+  return isTursoEnabled() ? tursoDelete(id) : sqlJsDelete(id);
 }
 
 export function getDbBackend(): "turso" | "sqljs" {
